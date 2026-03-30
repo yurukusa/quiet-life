@@ -144,18 +144,21 @@ function drawBeing(b, t) {
       b.trail.push({ x: b.x, y: b.y });
       if (b.trail.length > b.maxTrail) b.trail.shift();
 
+      // draw trail segments with gradual fade
       if (b.trail.length > 2) {
-        ctx.beginPath();
-        ctx.moveTo(b.trail[0].x, b.trail[0].y);
         for (let i = 1; i < b.trail.length - 1; i++) {
+          const segAlpha = (i / b.trail.length) * a * 0.5;
+          const segHue = b.hue + (b.age + i) * 0.1;
+          ctx.strokeStyle = `hsla(${segHue}, ${b.sat}%, 60%, ${segAlpha})`;
+          ctx.lineWidth = b.size * 0.5 * (i / b.trail.length);
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(b.trail[i - 1].x, b.trail[i - 1].y);
           const xc = (b.trail[i].x + b.trail[i + 1].x) / 2;
           const yc = (b.trail[i].y + b.trail[i + 1].y) / 2;
           ctx.quadraticCurveTo(b.trail[i].x, b.trail[i].y, xc, yc);
+          ctx.stroke();
         }
-        ctx.strokeStyle = `hsla(${b.hue + b.age * 0.1}, ${b.sat}%, 60%, ${a * 0.5})`;
-        ctx.lineWidth = b.size * 0.8;
-        ctx.lineCap = 'round';
-        ctx.stroke();
       }
 
       // head glow
@@ -297,17 +300,42 @@ function drawBeing(b, t) {
   }
 }
 
+// birth flash — soft ring of light when a being is born
+const flashes = [];
+function birthFlash(x, y, hue) {
+  flashes.push({ x, y, hue, age: 0, maxAge: 40 });
+}
+
+function drawFlashes() {
+  for (let i = flashes.length - 1; i >= 0; i--) {
+    const f = flashes[i];
+    f.age++;
+    const t = f.age / f.maxAge;
+    const r = 10 + t * 30;
+    const a = (1 - t) * 0.3;
+    ctx.strokeStyle = `hsla(${f.hue}, 50%, 70%, ${a})`;
+    ctx.lineWidth = 1 - t * 0.8;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    if (f.age >= f.maxAge) flashes.splice(i, 1);
+  }
+}
+
 function spawn(x, y) {
+  let b;
   if (beings.length >= MAX_BEINGS) {
-    // replace oldest
     let oldest = 0;
     for (let i = 1; i < beings.length; i++) {
       if (beings[i].age > beings[oldest].age) oldest = i;
     }
-    beings[oldest] = createBeing(x, y);
+    b = createBeing(x, y);
+    beings[oldest] = b;
   } else {
-    beings.push(createBeing(x, y));
+    b = createBeing(x, y);
+    beings.push(b);
   }
+  birthFlash(x, y, b.hue);
 }
 
 // interaction
@@ -365,11 +393,14 @@ C.addEventListener('touchend', e => {
 // main loop
 let frame = 0;
 function loop() {
-  // subtle fade (not full clear — leaves ghostly traces)
-  ctx.fillStyle = 'rgba(10, 10, 15, 0.06)';
+  // subtle fade — slower decay leaves longer, more beautiful traces
+  ctx.fillStyle = 'rgba(10, 10, 15, 0.04)';
   ctx.fillRect(0, 0, W, H);
 
   frame++;
+
+  // light blending for overlapping glow
+  ctx.globalCompositeOperation = 'lighter';
 
   for (let i = beings.length - 1; i >= 0; i--) {
     const b = beings[i];
@@ -387,6 +418,10 @@ function loop() {
     if (b.y < -50) b.y = H + 50;
     if (b.y > H + 50) b.y = -50;
   }
+
+  drawFlashes();
+
+  ctx.globalCompositeOperation = 'source-over';
 
   requestAnimationFrame(loop);
 }
