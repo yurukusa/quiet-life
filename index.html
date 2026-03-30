@@ -8,17 +8,20 @@
 * { margin: 0; padding: 0; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0a0f; }
 canvas { display: block; cursor: crosshair; }
-#hint {
-  position: fixed; bottom: 24px; left: 0; right: 0;
+#hint, #auto-hint {
+  position: fixed; left: 0; right: 0;
   text-align: center; color: rgba(255,255,255,0.15);
   font: 12px/1 "Helvetica Neue", sans-serif; letter-spacing: 0.3em;
   pointer-events: none; transition: opacity 2s;
 }
+#hint { bottom: 24px; }
+#auto-hint { top: 16px; opacity: 0; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="hint">touch anywhere</div>
+<div id="hint">touch anywhere / press space for auto</div>
+<div id="auto-hint"></div>
 <script>
 const C = document.getElementById('c');
 const ctx = C.getContext('2d');
@@ -322,6 +325,41 @@ C.addEventListener('pointermove', e => {
   if (e.buttons > 0 && Math.random() < 0.08) {
     spawn(e.clientX, e.clientY);
   }
+});
+
+// auto mode
+let autoMode = false;
+let autoTimer = null;
+const autoHint = document.getElementById('auto-hint');
+
+function toggleAuto() {
+  autoMode = !autoMode;
+  if (autoMode) {
+    autoHint.textContent = 'auto';
+    autoHint.style.opacity = '0.15';
+    if (hintShown) {
+      document.getElementById('hint').style.opacity = '0';
+      hintShown = false;
+    }
+    autoTimer = setInterval(() => {
+      spawn(Math.random() * W, Math.random() * H);
+    }, 600 + Math.random() * 800);
+  } else {
+    autoHint.style.opacity = '0';
+    clearInterval(autoTimer);
+  }
+}
+
+addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); toggleAuto(); }
+});
+
+// double-tap for mobile auto toggle
+let lastTap = 0;
+C.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - lastTap < 300) { toggleAuto(); e.preventDefault(); }
+  lastTap = now;
 });
 
 // main loop
