@@ -427,6 +427,45 @@ function loop() {
 }
 
 loop();
+
+// Birth sound - soft chime when a being appears
+let audioCtx = null;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playBirthSound(hue) {
+  if (!audioCtx) return;
+  // Map hue to frequency for variety
+  const baseFreq = 300 + (hue / 360) * 400;
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, audioCtx.currentTime + 0.15);
+
+  gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.8);
+}
+
+// Patch spawn to play sound
+const origSpawn = spawn;
+spawn = function(x, y) {
+  initAudio();
+  const prevLen = beings.length;
+  origSpawn(x, y);
+  const newBeing = beings[beings.length - 1] || beings.find(b => b.age === 0);
+  if (newBeing) playBirthSound(newBeing.hue);
+};
 </script>
 </body>
 </html>
