@@ -331,19 +331,18 @@ function drawFlashes() {
 }
 
 function spawn(x, y) {
-  let b;
+  let b = createBeing(x, y);
   if (beings.length >= MAX_BEINGS) {
     let oldest = 0;
     for (let i = 1; i < beings.length; i++) {
       if (beings[i].age > beings[oldest].age) oldest = i;
     }
-    b = createBeing(x, y);
     beings[oldest] = b;
   } else {
-    b = createBeing(x, y);
     beings.push(b);
   }
   birthFlash(x, y, b.hue);
+  return b;
 }
 
 // interaction
@@ -368,6 +367,12 @@ let autoMode = false;
 let autoTimer = null;
 const autoHint = document.getElementById('auto-hint');
 
+function autoSpawn() {
+  if (!autoMode) return;
+  spawn(Math.random() * W, Math.random() * H);
+  autoTimer = setTimeout(autoSpawn, 600 + Math.random() * 800);
+}
+
 function toggleAuto() {
   autoMode = !autoMode;
   if (autoMode) {
@@ -377,12 +382,10 @@ function toggleAuto() {
       document.getElementById('hint').style.opacity = '0';
       hintShown = false;
     }
-    autoTimer = setInterval(() => {
-      spawn(Math.random() * W, Math.random() * H);
-    }, 600 + Math.random() * 800);
+    autoSpawn();
   } else {
     autoHint.style.opacity = '0';
-    clearInterval(autoTimer);
+    clearTimeout(autoTimer);
   }
 }
 
@@ -420,11 +423,21 @@ function loop() {
       beings.splice(i, 1);
     }
 
-    // wrap around edges gently
+    // wrap around edges gently (including orbit center and children)
     if (b.x < -50) b.x = W + 50;
     if (b.x > W + 50) b.x = -50;
     if (b.y < -50) b.y = H + 50;
     if (b.y > H + 50) b.y = -50;
+    if (b.ox < -50) b.ox = W + 50;
+    if (b.ox > W + 50) b.ox = -50;
+    if (b.oy < -50) b.oy = H + 50;
+    if (b.oy > H + 50) b.oy = -50;
+    for (const ch of b.children) {
+      if (ch.x < -50) ch.x = W + 50;
+      if (ch.x > W + 50) ch.x = -50;
+      if (ch.y < -50) ch.y = H + 50;
+      if (ch.y > H + 50) ch.y = -50;
+    }
   }
 
   drawFlashes();
@@ -469,10 +482,9 @@ function playBirthSound(hue) {
 const origSpawn = spawn;
 spawn = function(x, y) {
   initAudio();
-  const prevLen = beings.length;
-  origSpawn(x, y);
-  const newBeing = beings[beings.length - 1] || beings.find(b => b.age === 0);
+  const newBeing = origSpawn(x, y);
   if (newBeing) playBirthSound(newBeing.hue);
+  return newBeing;
 };
 </script>
 </body>
